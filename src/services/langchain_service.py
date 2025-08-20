@@ -210,7 +210,7 @@ class LangChainService:
             
             # Step 4: Create and return Story object
             story = Story(
-                song_id=song.id,
+                song=song,
                 generated_story=story_content
             )
             
