@@ -122,6 +122,37 @@ The API will be available at `http://localhost:7000`
 | `GET` | `/api/v1/songs/{song_id}` | Get detailed song information |
 | `GET` | `/health` | Overall application health check |
 
+### Example Response
+
+**POST** `/api/v1/stories/generate` - Successful story generation:
+
+<details>
+<summary>Click to expand example response</summary>
+
+```json
+{
+  "story": {
+    "song": {
+      "id": 109096,
+      "title": "Creep",
+      "artist": "Radiohead",
+      "album": "Pablo Honey (Collector's Edition)",
+      "genre": null,
+      "release_year": 1992,
+      "lyrics_url": "https://genius.com/Radiohead-creep-lyrics",
+      "created_at": "2025-08-20T17:28:21.878589"
+    },
+    "generated_story": "The coffee shop buzzed with a gentle hum, a comforting sound to most, but to Arthur, it was a cacophony that amplified the silence within him. He watched her from a corner table, a figure of effortless grace. Elara. Her movements were fluid, like a whisper of smoke through sunlight, her laughter a chime of bells...",
+    "created_at": "2025-08-20T17:28:47.099257"
+  },
+  "message": "Story generated successfully"
+}
+```
+
+*Note: Response truncated for brevity. Full response includes complete lyrics and generated story.*
+
+</details>
+
 ### Interactive Documentation
 Visit `http://localhost:7000/docs` for comprehensive API documentation with interactive testing capabilities.
 
@@ -136,5 +167,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Developed by Abdelrahman Galhom**
-
-*Advanced AI-powered system for transforming musical content into narrative stories*
