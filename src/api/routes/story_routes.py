@@ -16,7 +16,23 @@ router = APIRouter()
 
 # Dependency to get services
 def get_langchain_service() -> LangChainService:
-    """Dependency to provide LangChain service"""
+    """
+    Dependency injection for LangChain service.
+    
+    Provides a configured LangChain service instance for story generation
+    endpoints. Handles initialization errors gracefully by converting
+    them to appropriate HTTP exceptions.
+    
+    Returns:
+        Configured LangChainService instance ready for story generation
+        
+    Raises:
+        HTTPException: 500 status if service initialization fails
+        
+    Note:
+        This dependency ensures proper error handling and service
+        availability for all story generation endpoints.
+    """
     try:
         return LangChainService()
     except Exception as e:
@@ -32,10 +48,34 @@ async def generate_story(
     langchain_service: LangChainService = Depends(get_langchain_service)
 ):
     """
-    Generate a story from a song name and optional artist.
+    Generate an original narrative story from song information.
     
-    This endpoint searches for the song, retrieves its data including lyrics
-    and annotations, then generates an original story based on the song's themes.
+    Takes a song name and optional artist, searches for the song on Genius,
+    retrieves complete metadata and lyrics, then uses AI to generate an
+    original story that captures the song's themes and emotional essence.
+    
+    Args:
+        request: Story generation request containing song name and optional artist
+        langchain_service: Injected LangChain service for AI processing
+        
+    Returns:
+        StoryResponse containing the complete song data and generated story
+        
+    Raises:
+        HTTPException: 
+            - 404 if song is not found on Genius
+            - 500 if story generation fails due to service issues
+            
+    Process:
+        1. Searches Genius database for matching song
+        2. Retrieves complete song data including lyrics and annotations
+        3. Analyzes lyrical content for themes and emotions
+        4. Generates original narrative using AI processing
+        5. Returns structured response with song and story data
+        
+    Note:
+        Generated stories are original works inspired by song themes,
+        not direct adaptations of copyrighted lyrics.
     """
     try:
         logger.info(f"Generating story for song: '{request.song_name}'" + 
@@ -63,7 +103,28 @@ async def generate_story(
 
 @router.get("/health", response_model=HealthResponse)
 async def service_health():
-    """Check the health of the story generation services"""
+    """
+    Comprehensive health check for story generation services.
+    
+    Validates the operational status of all components required for story
+    generation including AI services, API connections, and configuration.
+    Provides detailed status information for monitoring and debugging.
+    
+    Returns:
+        HealthResponse containing:
+            - Overall service status (healthy/degraded/error)
+            - Individual service status breakdown
+            - Error details if any services are failing
+            
+    Status Levels:
+        - healthy: All services operational
+        - degraded: Some services have issues but core functionality works
+        - error: Critical services are down
+        
+    Note:
+        Used by load balancers and monitoring systems to determine
+        service availability and routing decisions.
+    """
     try:
         # Test services initialization
         langchain_service = LangChainService()

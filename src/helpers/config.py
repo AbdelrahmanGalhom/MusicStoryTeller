@@ -3,6 +3,29 @@ from typing import Optional
 import os
 
 class Settings(BaseSettings):
+    """
+    Application configuration management using Pydantic settings.
+    
+    Centralizes all configuration parameters for the Music Storyteller application
+    including API credentials, service endpoints, and performance tuning parameters.
+    Supports environment variable loading and validation.
+    
+    Categories:
+        - Application: Basic app metadata and identification
+        - API Keys: Authentication credentials for external services
+        - Genius API: Configuration for Genius.com integration
+        - Gemini AI: Configuration for Google Gemini language model
+        
+    Environment Loading:
+        Automatically loads values from .env file and environment variables.
+        Environment variables take precedence over .env file values.
+        
+    Validation:
+        - Required fields will raise validation errors if missing
+        - Type conversion and validation applied automatically
+        - Sensitive values should be stored securely in environment
+    """
+    
     # Application Configuration
     APP_NAME: str
     APP_VERSION: str
@@ -36,4 +59,23 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 def get_settings() -> Settings:
+    """
+    Retrieve application configuration settings.
+    
+    Returns a singleton Settings instance with all configuration loaded
+    from environment variables and .env file. Uses caching to avoid
+    repeated file reads and environment variable access.
+    
+    Returns:
+        Settings: Validated configuration object with all parameters
+        
+    Raises:
+        ValidationError: If required configuration values are missing
+        or invalid
+        
+    Note:
+        This function should be used throughout the application instead
+        of directly instantiating Settings() to ensure consistent
+        configuration access.
+    """
     return Settings()

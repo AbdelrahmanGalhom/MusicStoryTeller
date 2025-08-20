@@ -17,7 +17,15 @@ class LangChainService:
     """Service class for generating stories from songs using LangChain with Google Gemini."""
     
     def __init__(self):
-        """Initialize the LangChain service with Gemini using config settings."""
+        """
+        Initialize the LangChain service with Gemini using config settings.
+        
+        Sets up the Google Gemini LLM, Genius API client, and story generation chain.
+        
+        Raises:
+            ValueError: If Gemini API key is missing from configuration
+            Exception: If initialization of any component fails
+        """
         logger.info("Initializing LangChain service")
         
         self.settings = get_settings()
@@ -54,7 +62,17 @@ class LangChainService:
         logger.info("LangChain service initialization completed")
     
     def _setup_story_generation_chain(self):
-        """Set up the LangChain chain for story generation."""
+        """
+        Set up the LangChain chain for story generation.
+        
+        Creates a prompt template and chain that combines song metadata, annotations,
+        and lyrical analysis to generate coherent narrative stories. The prompt is
+        designed to avoid copyright issues while capturing thematic essence.
+        
+        Sets:
+            self.story_prompt: PromptTemplate for story generation
+            self.story_chain: Complete LangChain pipeline for story creation
+        """
         logger.debug("Setting up story generation chain")
         
         story_prompt_template = """
@@ -96,17 +114,26 @@ class LangChainService:
     
     def analyze_lyrics(self, lyrics: Optional[str]) -> str:
         """
-        Analyze song lyrics to provide a combined thematic and contextual summary in one output,
-        without reproducing copyrighted content.
-
+        Analyze song lyrics to extract thematic and contextual elements.
+        
+        Processes lyrics to identify emotional themes, narrative elements, mood,
+        symbolism, and character development without reproducing copyrighted content.
+        Uses AI to generate a comprehensive thematic analysis.
+        
         Args:
-            lyrics: The song lyrics
-
+            lyrics: The song lyrics to analyze, can be None or empty
+            
         Returns:
-            A single string summarizing:
-                - Main emotional themes
-                - Story elements or narrative present
-
+            A comprehensive analysis string covering:
+                - Main emotional themes and mood
+                - Story elements and narrative progression
+                - Symbolic and metaphorical content
+                - Character personas and setting
+                - Overall atmospheric description
+                
+        Note:
+            Lyrics are truncated to 1500 characters to manage API limits.
+            Returns fallback message if lyrics are unavailable or analysis fails.
         """
         logger.debug("Starting lyrics thematic and contextual analysis")
 
@@ -161,14 +188,30 @@ class LangChainService:
 
     def generate_story_from_song_name(self, song_name: str, artist_name: Optional[str] = None) -> Story:
         """
-        Complete chain: Search song -> Retrieve data -> Generate story.
+        Complete end-to-end story generation pipeline from song name to narrative.
+        
+        Orchestrates the full workflow: searches for song by name, retrieves complete
+        song data including lyrics and annotations, then generates an original story
+        that captures the song's thematic essence.
         
         Args:
             song_name: Name of the song to search for
-            artist_name: Optional artist name to improve search accuracy
+            artist_name: Optional artist name to improve search accuracy and disambiguation
             
         Returns:
-            Story object with generated content
+            Story object containing the song data and generated narrative content
+            
+        Raises:
+            ValueError: If song is not found or song ID cannot be extracted
+            Exception: If any step in the pipeline fails (search, retrieval, generation)
+            
+        Process Flow:
+            1. Constructs search query from song and artist names
+            2. Uses Genius API to search for matching songs
+            3. Extracts song ID from first search result
+            4. Retrieves complete song data with lyrics and annotations
+            5. Generates story using AI processing pipeline
+            6. Returns complete Story object with all metadata
         """
         logger.info(f"Starting story generation for song: '{song_name}'" + 
                    (f" by {artist_name}" if artist_name else ""))
@@ -224,13 +267,27 @@ class LangChainService:
 
     def generate_story_from_song(self, song: Song) -> str:
         """
-        Generate a story from a Song object using lyrics, annotations, and thematic analysis.
+        Generate a narrative story from a complete Song object.
+        
+        Takes a fully populated Song object and creates an original story that
+        captures the essence and themes of the song. Combines lyrical analysis,
+        expert annotations, and metadata to inform the narrative generation.
         
         Args:
-            song: Song object with all necessary data
+            song: Song object containing title, artist, lyrics, annotations, and metadata
             
         Returns:
-            Generated story as string
+            Generated story as a string (300-500 words typically)
+            
+        Raises:
+            Exception: If story generation fails due to AI service issues
+            
+        Process:
+            1. Analyzes lyrics for thematic content
+            2. Processes expert annotations for context
+            3. Combines all data into story generation prompt
+            4. Uses LangChain pipeline to generate narrative
+            5. Returns polished story content
         """
         logger.info(f"Generating story from song object: '{song.title}' by {song.artist}")
         

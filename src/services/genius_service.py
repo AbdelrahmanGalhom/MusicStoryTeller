@@ -15,7 +15,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class GeniusClient:
+    """
+    Client for interacting with the Genius API and web scraping service.
+    
+    Provides comprehensive functionality for searching songs, retrieving metadata,
+    scraping lyrics, and fetching expert annotations from Genius.com. Handles
+    rate limiting, error recovery, and data formatting for downstream processing.
+    """
+    
     def __init__(self):
+        """
+        Initialize the Genius client with configuration settings.
+        
+        Sets up API authentication, request headers, and session management
+        for both API calls and web scraping operations.
+        
+        Raises:
+            Exception: If configuration loading fails or API credentials are invalid
+        """
         self.settings = get_settings()
         self.base_url = self.settings.GENIUS_BASE_URL
         self.headers = {
@@ -26,7 +43,23 @@ class GeniusClient:
         self.session.headers.update(self.headers)
         
     def _make_request(self, endpoint: str, params: Optional[Dict] = None) -> Optional[Dict]:
-        """HTTP request wrapper with error handling and rate limiting"""
+        """
+        Execute HTTP request to Genius API with error handling and rate limiting.
+        
+        Handles authentication, timeout management, and error recovery for all
+        API interactions. Implements configurable delays to respect rate limits.
+        
+        Args:
+            endpoint: API endpoint path (e.g., "/search", "/songs/{id}")
+            params: Optional query parameters for the request
+            
+        Returns:
+            JSON response as dictionary if successful, None if request fails
+            
+        Note:
+            Automatically adds base URL, authentication headers, and implements
+            request delay based on configuration settings.
+        """
         try:
             url = f"{self.base_url}{endpoint}"
             time.sleep(self.settings.GENIUS_REQUEST_DELAY)
@@ -44,7 +77,23 @@ class GeniusClient:
             return None
     
     def _make_web_request(self, url: str) -> Optional[str]:
-        """Make web request for scraping with proper headers"""
+        """
+        Execute web scraping request with appropriate headers and error handling.
+        
+        Designed for scraping lyrics pages and other web content from Genius.
+        Implements proper user agent headers and timeout management to avoid
+        being blocked while maintaining respectful scraping practices.
+        
+        Args:
+            url: Full URL to scrape content from
+            
+        Returns:
+            Raw HTML content as string if successful, None if request fails
+            
+        Note:
+            Includes automatic rate limiting and uses application-specific
+            user agent to identify requests appropriately.
+        """
         try:
             time.sleep(self.settings.GENIUS_REQUEST_DELAY)
             response = requests.get(
@@ -59,7 +108,26 @@ class GeniusClient:
             return None
     
     def _extract_song_metadata(self, song_details: Dict) -> Dict:
-        """Extract and parse song metadata from API response"""
+        """
+        Extract and parse song metadata from Genius API response.
+        
+        Processes complex API response data to extract clean metadata including
+        album information, release year, and genre tags. Handles various date
+        formats and missing data gracefully.
+        
+        Args:
+            song_details: Raw song data dictionary from Genius API
+            
+        Returns:
+            Dictionary containing:
+                - album: Album name (str or None)
+                - release_year: Release year as integer (int or None)
+                - genre: Comma-separated genre tags (str or None)
+                
+        Note:
+            Uses regex pattern matching for year extraction and limits genre
+            tags to first 3 entries to avoid overwhelming metadata.
+        """
         metadata = {
             'album': song_details.get("album", {}).get("name") if song_details.get("album") else None,
             'release_year': None,
@@ -86,7 +154,32 @@ class GeniusClient:
         return metadata
     
     def _scrape_lyrics(self, lyrics_url: str) -> Optional[str]:
-        """Scrape lyrics from Genius lyrics page"""
+        """
+        Scrape and clean lyrics from Genius lyrics page.
+        
+        Performs sophisticated web scraping to extract clean lyrics content
+        while filtering out advertisements, annotations UI, contributor info,
+        and other non-lyrical content. Handles various page layouts and
+        formats used by Genius.
+        
+        Args:
+            lyrics_url: Full URL to the Genius lyrics page
+            
+        Returns:
+            Clean, formatted lyrics text with proper line breaks and structure,
+            or None if scraping fails
+            
+        Process:
+            1. Fetches HTML content from lyrics page
+            2. Identifies lyrics containers using multiple selectors
+            3. Removes unwanted UI elements and metadata
+            4. Preserves lyrical structure (verses, choruses, etc.)
+            5. Cleans and formats final text output
+            
+        Note:
+            Handles multiple Genius page layouts and removes language
+            selection menus, ads, and annotation overlays automatically.
+        """
         logger.info(f"Scraping lyrics from: {lyrics_url}")
         
         html_content = self._make_web_request(lyrics_url)
@@ -162,7 +255,25 @@ class GeniusClient:
         return lyrics
     
     def search_song(self, query: str, limit: Optional[int] = None) -> List[Dict]:
-        """Search for songs on Genius"""
+        """
+        Search for songs on Genius using text query.
+        
+        Performs fuzzy text search across Genius database to find matching songs
+        based on title, artist, or lyrical content. Returns ranked results
+        ordered by relevance score.
+        
+        Args:
+            query: Search query string (song title, artist name, or lyrics snippet)
+            limit: Maximum number of results to return (uses config default if None)
+            
+        Returns:
+            List of song dictionaries containing basic metadata for each match.
+            Empty list if no results found or search fails.
+            
+        Note:
+            Results are automatically limited by configuration to prevent
+            excessive API usage. First result typically has highest relevance.
+        """
         limit = limit or self.settings.GENIUS_MAX_SEARCH_RESULTS
         logger.info(f"Searching for song: {query}")
             
@@ -176,7 +287,23 @@ class GeniusClient:
         return songs
     
     def get_song_details(self, song_id: int) -> Optional[Dict]:
-        """Get detailed song information"""
+        """
+        Retrieve comprehensive song information from Genius API.
+        
+        Fetches complete song metadata including title, artist, album,
+        release information, and other structured data from Genius database.
+        
+        Args:
+            song_id: Unique Genius song identifier
+            
+        Returns:
+            Complete song data dictionary with all available metadata,
+            or None if song not found or API call fails
+            
+        Note:
+            Uses plain text format for better processing of textual content
+            and includes all available metadata fields from Genius API.
+        """
         logger.info(f"Getting details for song ID: {song_id}")
         
         response = self._make_request(f"/songs/{song_id}", {"text_format": "plain"})
@@ -189,7 +316,37 @@ class GeniusClient:
         return song_data
     
     def get_song_annotations(self, song_id: int) -> List[Dict]:
-        """Get all annotations for a song by fetching referents"""
+        """
+        Retrieve all expert annotations and explanations for a song.
+        
+        Fetches community-contributed annotations that explain lyrical meanings,
+        cultural references, and artistic interpretations. Handles pagination
+        to collect all available annotations across multiple API pages.
+        
+        Args:
+            song_id: Unique Genius song identifier
+            
+        Returns:
+            List of annotation dictionaries containing:
+                - id: Annotation unique identifier
+                - body: Annotation explanation text
+                - fragment: Lyrical fragment being annotated
+                - url: Direct link to annotation
+                - votes_total: Community voting score
+                - verified: Whether annotation is verified by Genius
+                - author: Username of annotation contributor
+                
+        Process:
+            1. Iterates through paginated API responses
+            2. Extracts annotations from referent objects
+            3. Collects metadata and voting information
+            4. Returns consolidated list of all annotations
+            
+        Note:
+            Automatically handles pagination and stops when no more
+            annotations are available. Includes verification status
+            for quality assessment.
+        """
         logger.info(f"Getting annotations for song ID: {song_id}")
         
         all_annotations = []
@@ -237,7 +394,30 @@ class GeniusClient:
         return all_annotations
     
     def _format_lyrics(self, lyrics: str) -> str:
-        """Clean and format scraped lyrics"""
+        """
+        Clean and format scraped lyrics for consistent processing.
+        
+        Removes metadata, navigation elements, and non-lyrical content while
+        preserving the structural integrity of verses, choruses, and other
+        song sections. Applies consistent formatting rules.
+        
+        Args:
+            lyrics: Raw scraped lyrics text containing mixed content
+            
+        Returns:
+            Clean, formatted lyrics with proper line breaks and structure
+            
+        Process:
+            1. Splits text into lines for individual processing
+            2. Identifies and preserves lyrical structure markers
+            3. Removes contributor info and translation metadata
+            4. Cleans up whitespace and formatting artifacts
+            5. Removes common Genius UI artifacts and promotional content
+            
+        Note:
+            Preserves song structure markers like [Verse], [Chorus] while
+            removing extraneous content like "Read More" links and embeds.
+        """
         # Remove metadata and non-lyric content from the beginning
         lines = lyrics.split('\n')
         clean_lines = []
@@ -290,7 +470,32 @@ class GeniusClient:
         return cleaned_lyrics.strip()
     
     def get_song_lyrics_with_annotations(self, song_id: int) -> Optional[Song]:
-        """Get complete song information including lyrics and annotations"""
+        """
+        Retrieve complete song data including lyrics, metadata, and annotations.
+        
+        Orchestrates the full data collection process to create a comprehensive
+        Song object with all available information from Genius. Combines API
+        data retrieval with web scraping for complete coverage.
+        
+        Args:
+            song_id: Unique Genius song identifier
+            
+        Returns:
+            Complete Song object with all metadata, lyrics, and annotations,
+            or None if data retrieval fails
+            
+        Process:
+            1. Fetches structured song details via API
+            2. Extracts and parses metadata (album, year, genre)
+            3. Retrieves all community annotations
+            4. Scrapes and cleans lyrics from web page
+            5. Combines all data into structured Song object
+            
+        Note:
+            This is the primary method for getting complete song information.
+            Handles failures gracefully and logs detailed progress information
+            for debugging and monitoring purposes.
+        """
         logger.info(f"Getting complete song data for ID: {song_id}")
         
         # Get song details
