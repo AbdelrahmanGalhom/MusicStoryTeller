@@ -70,9 +70,7 @@ class LangChainService:
         
         Song Annotations (Expert Analysis): {annotations}
         
-        Lyrical Themes Analysis: {lyrics_summary}
-        
-        Song Lyrics Context: {lyrics_context}
+        Lyrical Themes and Context Analysis: {lyrics_summary}
         
         Instructions:
         - Create an original narrative story inspired by the song's themes and emotions
@@ -88,7 +86,7 @@ class LangChainService:
         """
         
         self.story_prompt = PromptTemplate(
-            input_variables=["title", "artist", "album", "genre", "release_year", "annotations", "lyrics_summary", "lyrics_context"],
+            input_variables=["title", "artist", "album", "genre", "release_year", "annotations", "lyrics_summary"],
             template=story_prompt_template
         )
         
@@ -96,118 +94,70 @@ class LangChainService:
         
         logger.debug("Story generation chain setup completed")
     
-    def _summarize_lyrics_themes(self, lyrics: Optional[str]) -> str:
+    def analyze_lyrics(self, lyrics: Optional[str]) -> str:
         """
-        Create a thematic summary of lyrics without reproducing copyrighted content.
-        
+        Analyze song lyrics to provide a combined thematic and contextual summary in one output,
+        without reproducing copyrighted content.
+
         Args:
             lyrics: The song lyrics
-            
+
         Returns:
-            A summary of themes and emotions
+            A single string summarizing:
+                - Main emotional themes
+                - Story elements or narrative present
+
         """
-        logger.debug("Starting lyrics theme summarization")
-        
+        logger.debug("Starting lyrics thematic and contextual analysis")
+
         if not lyrics or len(lyrics.strip()) == 0:
-            logger.warning("No lyrics provided for theme analysis")
+            logger.warning("No lyrics provided for combined analysis")
             return "No lyrical content available for analysis."
 
-        logger.debug(f"Lyrics provided for theme analysis: {lyrics}")
-        logger.debug(f"Analyzing lyrics of length: {len(lyrics)} characters")
-        
-        # Create a summary prompt that focuses on themes, not reproduction
         summary_prompt_template = """
-        Analyze the following song content and provide a brief thematic summary focusing on:
+        Analyze the following song lyrics and provide a summary covering:
+
         - Main emotional themes
         - Story elements or narrative present
         - Overall mood and atmosphere
         - Key symbolic or metaphorical elements
-        
-        Do not reproduce or quote the lyrics directly. Provide only a thematic analysis.
-        
-        Content: {lyrics}
-        
-        Thematic Summary:
-        """
-        
-        summary_prompt = PromptTemplate(
-            input_variables=["lyrics"],
-            template=summary_prompt_template
-        )
-        
-        summary_chain = summary_prompt | self.llm
-        
-        try:
-            truncated_lyrics = lyrics[:1000]
-            logger.debug(f"Processing truncated lyrics: {len(truncated_lyrics)} characters")
-            
-            response = summary_chain.invoke({"lyrics": truncated_lyrics})
-            # Extract content from response
-            summary_result = response.content.strip() if hasattr(response, 'content') else str(response).strip()
-            
-            logger.info(f"Successfully generated lyrics theme summary: {len(summary_result)} characters")
-            logger.debug(f"Theme summary preview: {summary_result[:100]}...")
-            
-            return summary_result
-        except Exception as e:
-            logger.error(f"Failed to analyze lyrical themes: {str(e)}")
-            return f"Unable to analyze lyrical themes: {str(e)}"
-    
-    def _get_lyrics_context(self, lyrics: Optional[str]) -> str:
-        """
-        Extract key emotional and narrative elements from lyrics for story context.
-        
-        Args:
-            lyrics: The song lyrics
-            
-        Returns:
-            A contextual summary focusing on story elements
-        """
-        logger.debug("Extracting lyrics context for story generation")
-        
-        if not lyrics or len(lyrics.strip()) == 0:
-            logger.warning("No lyrics provided for context extraction")
-            return "No lyrical context available."
-        
-        logger.debug(f"Extracting context from lyrics of length: {len(lyrics)} characters")
-        
-        context_prompt_template = """
-        Extract story-relevant elements from these song lyrics:
         - Emotional journey or progression
         - Characters or personas mentioned
         - Setting or atmosphere described
         - Key metaphors or imagery
         - Narrative arc or story elements
-        
-        Focus on elements that could inspire a fictional narrative. Do not quote lyrics directly.
-        
+
+        Do NOT reproduce or directly quote the lyrics. Provide only a thematic and contextual analysis.
+
         Lyrics: {lyrics}
-        
-        Story Context Elements:
+
+        Combined Thematic and Contextual Summary:
         """
-        
-        context_prompt = PromptTemplate(
+
+        summary_prompt = PromptTemplate(
             input_variables=["lyrics"],
-            template=context_prompt_template
+            template=summary_prompt_template
         )
-        
-        context_chain = context_prompt | self.llm
-        
+
+        summary_chain = summary_prompt | self.llm
+
         try:
-            truncated_lyrics = lyrics[:1500]
-            logger.debug(f"Processing lyrics for context: {len(truncated_lyrics)} characters")
-            
-            response = context_chain.invoke({"lyrics": truncated_lyrics})
-            # Extract content from response
-            context_result = response.content.strip() if hasattr(response, 'content') else str(response).strip()
-            
-            logger.info(f"Successfully extracted lyrics context: {len(context_result)} characters")
-            logger.debug(f"Context preview: {context_result[:100]}...")
-            
-            return context_result
+            truncated_lyrics = lyrics[:1500]  
+            logger.debug(f"Processing truncated lyrics for summary analysis: {len(truncated_lyrics)} characters")
+
+            response = summary_chain.invoke({"lyrics": truncated_lyrics})
+            summary = response.content.strip() if hasattr(response, 'content') else str(response).strip()
+
+            logger.info(f"Successfully generated lyrics summary: {len(summary)} characters")
+            logger.debug(f"Summary preview: {summary[:100]}...")
+
+            return summary
+
         except Exception as e:
-            logger.error(f"Failed to extract lyrical context: {str(e)}")
-            return f"Unable to extract lyrical context: {str(e)}"
+            logger.error(f"Failed to analyze lyrics summary: {str(e)}")
+            return f"Unable to analyze lyrics: {str(e)}"
+
+
 
     def generate_story_from_song_name(self, song_name: str, artist_name: Optional[str] = None) -> Story:
         """
@@ -271,6 +221,7 @@ class LangChainService:
             logger.error(f"Failed to generate story for '{song_name}': {str(e)}")
             raise Exception(f"Failed to generate story: {str(e)}")
 
+
     def generate_story_from_song(self, song: Song) -> str:
         """
         Generate a story from a Song object using lyrics, annotations, and thematic analysis.
@@ -284,13 +235,9 @@ class LangChainService:
         logger.info(f"Generating story from song object: '{song.title}' by {song.artist}")
         
         try:
-            # Generate thematic analysis of lyrics
-            logger.debug("Generating thematic analysis of lyrics")
-            lyrics_summary = self._summarize_lyrics_themes(song.lyrics)
-            
-            # Extract story context from lyrics
-            logger.debug("Extracting story context from lyrics")
-            lyrics_context = self._get_lyrics_context(song.lyrics)
+            # Generate analysis of lyrics
+            logger.debug("Generating analysis of lyrics")
+            lyrics_summary = self.analyze_lyrics(song.lyrics)
             
             # Prepare annotations summary
             annotations_count = len(song.annotations) if song.annotations else 0
@@ -312,7 +259,6 @@ class LangChainService:
                 "release_year": song.release_year or "Unknown Year",
                 "annotations": annotations_text,
                 "lyrics_summary": lyrics_summary,
-                "lyrics_context": lyrics_context
             })
             
             # Extract content from response
